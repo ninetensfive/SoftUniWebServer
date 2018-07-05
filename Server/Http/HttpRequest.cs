@@ -6,6 +6,7 @@ using SoftUniWebServer.Server.Enums;
 using SoftUniWebServer.Server.Common;
 using System.Linq;
 using SoftUniWebServer.Server.Exceptions;
+using System.Net;
 
 namespace SoftUniWebServer.Server.Http
 {
@@ -41,12 +42,14 @@ namespace SoftUniWebServer.Server.Http
             this.Method = ParseMethod(requestLine[0]);
             this.Url = requestLine[1];
             this.Path = this.ParsePath(this.Url);
-            this.ParseHeaders(requestLines);
 
+            this.ParseHeaders(requestLines);
+            this.ParseParameters();
+            this.ParseFormData(requestLines.Last());
 
         }
 
-
+       
 
         public IDictionary<string, string> FormData { get; private set; }
 
@@ -109,6 +112,52 @@ namespace SoftUniWebServer.Server.Http
             if (!this.Headers.ContainsKey("Host"))
             {
                 throw new BadRequestException();
+            }
+        }
+
+        private void ParseParameters()
+        {
+            if (!this.Url.Contains('?'))
+            {
+                return;
+            }
+
+            this.ParseQuery(this.Url, this.UrlParameters);
+        }
+
+        private void ParseFormData(string formDataLine)
+        {
+            if(this.Method == HttpRequestMethod.Get)
+            {
+                return;
+            }
+
+            this.ParseQuery(formDataLine, this.QueryParameters);
+        }
+
+        private void ParseQuery(string queryString, IDictionary<string,string> dict)
+        {
+            var query = CoreParser.Split(queryString, new char[] { '?' }).Last();
+            if (!query.Contains('='))
+            {
+                return;
+            }
+
+            var queryPairs = CoreParser.Split(query, new char[] { '&' });
+
+            foreach (var queryPair in queryPairs)
+            {
+                var queryKvp = CoreParser.Split(queryPair, new char[] { '=' });
+
+                if (queryKvp.Length != 2)
+                {
+                    continue;
+                }
+
+                var key = WebUtility.UrlDecode(queryKvp[0]);
+                var value = WebUtility.UrlDecode(queryKvp[1]);
+
+                dict[key] = value;
             }
         }
     }
